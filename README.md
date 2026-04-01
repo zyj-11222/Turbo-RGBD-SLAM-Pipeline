@@ -21,7 +21,14 @@
 ### 3. 激光点云配准与建图 (LiDAR Mapping)
 * `src/icp_test.cpp` & `pcl_visualize.cpp`: 手动拆解并实现了 ICP (迭代最近点) 算法的 3D 动态可视化。
 * `src/pcl_mapping.cpp`: 实现了多帧点云的坐标系增量拼接，并引入 Voxel Grid 体素滤波解决了大规模点云建图的内存爆炸问题。
+### 📈 精度评估 (Accuracy Evaluation)
+本项目使用 `evo` 工具在 TUM RGB-D 数据集上进行了闭环测试。
 
+**测试序列**：`fr1/desk`
+**评估指标**：Absolute Trajectory Error (ATE)
+
+![Trajectory Plot](./docs/evo_result.png)
+*注：当前版本为纯单目里程计实现，未加入尺度闭环，图中展示了经过 Sim(3) 对齐后的轨迹形态，RMSE 表现符合单目 VO 预期。*
 ## 🏃 如何运行
 
 ```bash
