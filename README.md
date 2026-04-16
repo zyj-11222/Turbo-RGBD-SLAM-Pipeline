@@ -1,41 +1,32 @@
-# Mini SLAM System: 视觉与激光里程计实战
+# 🚀 Turbo-RGBD-SLAM-Pipeline
 
-本项目是一个基于 C++17 开发的轻量级 SLAM（同时定位与建图）算法实践库。涵盖了从单目视觉里程计 (VO) 前端、后端非线性优化 (BA) 到激光雷达点云配准 (ICP) 的核心流程。
+![ROS Version](https://img.shields.io/badge/ROS-Noetic-green.svg)
+![C++](https://img.shields.io/badge/C++-14-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Build](https://img.shields.io/badge/Build-Passing-brightgreen.svg)
 
-## 🛠️ 技术栈
-* **语言**: C++17, CMake
-* **视觉算法**: OpenCV 4 (ORB特征, RANSAC, 对极几何, 三角测量)
-* **后端优化**: Ceres Solver (Bundle Adjustment, 重投影误差优化)
-* **激光算法**: PCL 1.2+ (ICP, VoxelGrid 降采样, 3D 可视化)
+**Turbo-RGBD-SLAM** 是一套面向工业级落地的 RGB-D SLAM 稠密建图与评测流水线。本项目摒弃了传统的“玩具级”脚本写法，全面采用 **面向对象 (OOP)** 设计、**TF 动态坐标树** 管理、**多传感器硬件级时间同步 (Message Filters)**，并通过 **OpenMP 多线程** 将点云处理性能榨取到极致。
 
-## 🚀 核心模块与功能
+---
 
-### 1. 视觉前端 (Visual Odometry)
-* `src/vo_sequence.cpp`: 基于 TUM 数据集 (`fr1/desk`) 实现了 Frame-to-Frame 的单目视觉里程计。
-* **亮点**: 深入解决了相机纯旋转与共面场景下的三角化数值下溢出 (Numerical Underflow) 问题，实现了基于归一化平面的高鲁棒性位姿求解。
+## ✨ 核心工程特性 (Core Features)
 
-### 2. 后端优化 (Backend Optimization)
-* `src/ceres_ba.cpp`: 构建了基于 Ceres 的非线性图优化器。
-* **亮点**: 通过自动求导 (AutoDiff) 实现了 Structure-Only Bundle Adjustment，最小化重投影误差，并在工程中深刻验证了单目 SLAM 的尺度漂移 (Scale Drift) 现象。
+- 🏗️ **解耦式架构设计**：采用 YAML + Launch 的参数服务器架构，算法核心代码与超参数完美隔离，支持零代码修改适配多款传感器。
+- ⏱️ **严格的时空同步**：采用 `message_filters::ApproximateTime` 解决 RGB 与 Depth 相机的硬件时钟不同步现象，彻底杜绝“点云拖影/撕裂”。
+- ⚡ **OpenMP 极限压榨**：摒弃低效的降采样跳步，利用 C++ 多线程重构双重循环，实现全分辨率点云的毫秒级极速渲染。
+- 📊 **CI/CD 级自动化评测**：内置基于 `evo` 的自动化评测脚本，一键生成绝对轨迹误差 (ATE) 的可视化曲线，用数据量化算法精度。
+- 🐳 **云原生级一键部署**：提供完整工业级 `Dockerfile`，将繁杂的 PCL/OpenCV/ROS 依赖整体打包，实现“拉取即运行”。
 
-### 3. 激光点云配准与建图 (LiDAR Mapping)
-* `src/icp_test.cpp` & `pcl_visualize.cpp`: 手动拆解并实现了 ICP (迭代最近点) 算法的 3D 动态可视化。
-* `src/pcl_mapping.cpp`: 实现了多帧点云的坐标系增量拼接，并引入 Voxel Grid 体素滤波解决了大规模点云建图的内存爆炸问题。
-### 📈 精度评估 (Accuracy Evaluation)
-本项目使用 `evo` 工具在 TUM RGB-D 数据集上进行了闭环测试。
+---
 
-**测试序列**：`fr1/desk`
-**评估指标**：Absolute Trajectory Error (ATE)
+## 🛠️ 快速开始 (Quick Start)
 
-![Trajectory Plot](./docs/evo_result.png)
-*注：当前版本为纯单目里程计实现，未加入尺度闭环，图中展示了经过 Sim(3) 对齐后的轨迹形态，RMSE 表现符合单目 VO 预期。*
-## 🏃 如何运行
+### 方式一：本地源码编译 (Local Build)
 
-```bash
-mkdir build && cd build
-cmake ..
-make
-# 运行视觉里程计 (请确保已下载 TUM 数据集至正确路径)
-./vo_sequence
-# 运行点云缝合建图
-./pcl_mapping
+1. **环境准备**：Ubuntu 20.04 + ROS Noetic + PCL + OpenCV
+2. **克隆与编译**：
+   ```bash
+   mkdir -p ~/slam_ws/src && cd ~/slam_ws/src
+   git clone [https://github.com/YourUsername/Turbo-RGBD-SLAM-Pipeline.git](https://github.com/YourUsername/Turbo-RGBD-SLAM-Pipeline.git) my_slam
+   cd ~/slam_ws
+   catkin_make -DCMAKE_BUILD_TYPE=Release

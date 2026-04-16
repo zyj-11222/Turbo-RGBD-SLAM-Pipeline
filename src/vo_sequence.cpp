@@ -7,6 +7,13 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
+// ==========================================
+// 🚀 ROS 1 核心头文件
+// ==========================================
+#include <ros/ros.h>
+#include <nav_msgs/Path.h>
+#include <geometry_msgs/PoseStamped.h>
+
 using namespace std;
 using namespace cv;
 
@@ -16,18 +23,29 @@ struct FrameInfo {
     string filename;
 };
 
-int main() {
-    string dataset_dir = "../sequence/";
+int main(int argc, char** argv) {
+    // 1. 初始化 ROS 1
+    ros::init(argc, argv, "vo_node");
+    ros::NodeHandle nh;
+    
+    // 创建一个发布者，发布的话题名叫 "camera_path"
+    ros::Publisher path_pub = nh.advertise<nav_msgs::Path>("camera_path", 10, true);
+
+    // 定义我们要发布的路径消息
+    nav_msgs::Path path_msg;
+    path_msg.header.frame_id = "map"; // 极其重要：告诉 RViz 这个轨迹在哪个坐标系下
+
+    string dataset_dir = "/home/zyj/slam_ws/src/my_slam/sequence/";
     string list_file = dataset_dir + "rgb.txt";
 
-    // 1. 初始化保存文件逻辑（放在最前面）
-    std::ofstream pose_file("../results/camera_poses.txt");
+    // 2. 初始化保存文件逻辑
+    std::ofstream pose_file("/home/zyj/slam_ws/src/my_slam/sequence/camera_poses.txt");
     if (!pose_file.is_open()) {
         std::cerr << "🚨 无法创建位姿文件！请检查是否已经创建了 results 文件夹。" << std::endl;
         return -1;
     }
 
-    // 2. 读取 rgb.txt 图片清单（包含时间戳）
+    // 3. 读取 rgb.txt 图片清单（包含时间戳）
     ifstream fin(list_file);
     if (!fin) {
         cout << "🚨 找不到 rgb.txt！请检查 sequence 文件夹位置！" << endl;
@@ -45,10 +63,9 @@ int main() {
     }
     cout << "✅ 成功读取图片清单，共 " << frames.size() << " 张图片。" << endl;
 
-    // 3. 初始化全局位姿和画布
+    // 4. 初始化全局位姿
     Mat R_global = Mat::eye(3, 3, CV_64F);
     Mat t_global = Mat::zeros(3, 1, CV_64F);
-    Mat trajectory = Mat::zeros(600, 600, CV_8UC3);
 
     Ptr<FeatureDetector> detector = ORB::create(500);
     Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-Hamming");
@@ -60,19 +77,17 @@ int main() {
     double focal = 517.3; 
     Point2d pp(318.6, 255.3);
 
-    // 窗口排版
+    // 窗口排版 (只保留相机视图，轨迹交由 RViz 显示)
     namedWindow("TUM Dataset View", WINDOW_NORMAL);
     resizeWindow("TUM Dataset View", 640, 480);
-    namedWindow("Robot Trajectory", WINDOW_NORMAL);
-    resizeWindow("Robot Trajectory", 600, 600);
 
     // 处理第一张图
     img_prev = imread(dataset_dir + frames[0].filename, IMREAD_GRAYSCALE);
     if (img_prev.empty()) { cout << "🚨 读不到第一张图！" << endl; return -1; }
     detector->detectAndCompute(img_prev, noArray(), kp_prev, desc_prev);
 
-    // 4. 开始接力循环
-    for (size_t i = 1; i < frames.size(); i++) {
+    // 5. 开始接力循环 (加入 ros::ok() 以便支持 Ctrl+C 中断)
+    for (size_t i = 1; i < frames.size() && ros::ok(); i++) {
         Mat img_curr = imread(dataset_dir + frames[i].filename, IMREAD_GRAYSCALE);
         if (img_curr.empty()) continue;
 
@@ -105,10 +120,7 @@ int main() {
         t_global = t_global + 1.0 * (R_global * t);
         R_global = R * R_global;
 
-        // ==========================================
-        // 💾 保存位姿到文件 (重点修改在这里)
-        // ==========================================
-        // 1. 把 OpenCV 的 R 转换成 Eigen 的旋转矩阵，再转为四元数
+        // 把 OpenCV 的 R 转换成 Eigen 的旋转矩阵，再转为四元数
         Eigen::Matrix3d R_eigen;
         for (int r = 0; r < 3; r++)
             for (int c = 0; c < 3; c++)
@@ -116,23 +128,41 @@ int main() {
         
         Eigen::Quaterniond q(R_eigen);
 
-        // 2. 写入文件：时间戳 tx ty tz qx qy qz qw
+        // 写入位姿文件
         pose_file << std::fixed << std::setprecision(6) << frames[i].timestamp << " "
                   << t_global.at<double>(0) << " " << t_global.at<double>(1) << " " << t_global.at<double>(2) << " "
                   << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << endl;
 
-        // 绘制轨迹
-        int draw_x = int(t_global.at<double>(0) * 5) + 300; 
-        int draw_y = int(t_global.at<double>(2) * 5) + 300; 
-        if (draw_x >= 0 && draw_x < 600 && draw_y >= 0 && draw_y < 600) {
-            circle(trajectory, Point(draw_x, draw_y), 1, CV_RGB(0, 255, 0), FILLED);
-        }
-
+        // 显示相机实时画面
         imshow("TUM Dataset View", img_curr);
-        imshow("Robot Trajectory", trajectory);
         waitKey(1); // 提速，方便快速跑完序列
 
-        // 传球
+        // ==========================================
+        // 🚀 ROS 1 发布轨迹逻辑
+        // ==========================================
+        geometry_msgs::PoseStamped pose;
+        pose.header.stamp = ros::Time::now(); // 打上当前的时间戳
+        pose.header.frame_id = "map";    // 统一参考系
+
+        // 填入平移 (注意 OpenCV 矩阵元素的读取)
+        pose.pose.position.x = t_global.at<double>(0);
+        pose.pose.position.y = t_global.at<double>(1);
+        pose.pose.position.z = t_global.at<double>(2);
+
+        // 填入旋转 (四元数)
+        pose.pose.orientation.x = q.x();
+        pose.pose.orientation.y = q.y();
+        pose.pose.orientation.z = q.z();
+        pose.pose.orientation.w = q.w();
+
+        // 把当前点塞进路径里，并发布出去！
+        path_msg.poses.push_back(pose);
+        path_pub.publish(path_msg);
+
+        // 让 ROS 1 处理一下底层通讯回调
+        ros::spinOnce();
+
+        // 传球：当前帧变成下一轮的上一帧
         img_prev = img_curr.clone();
         kp_prev = kp_curr;
         desc_prev = desc_curr.clone();
@@ -140,6 +170,6 @@ int main() {
 
     pose_file.close();
     cout << "🏁 序列播放完毕，位姿已保存至 results/camera_poses.txt！" << endl;
-    waitKey(0);
+    ros::spin();
     return 0;
 }

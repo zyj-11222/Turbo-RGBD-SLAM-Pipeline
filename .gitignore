@@ -1,6 +1,21 @@
+# 1. 忽略编译产生的临时文件
 build/
-results/
-.vscode/
+devel/
+*.o
 *.so
 *.a
-rotation_practice
+
+# 2. 忽略庞大的数据集文件夹
+sequence/
+data/
+
+# 3. 忽略运行生成的产物和大型地图文件
+results/
+*.pcd
+*.zip
+*.bag
+
+# 4. 忽略 IDE (如 VSCode, CLion) 产生的隐藏配置
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,7 @@
+<launch>
+    <rosparam file="$(find my_slam)/config/tum_fr1.yaml" command="load" />
+
+    <node pkg="my_slam" type="dataset_publisher.py" name="data_player" output="screen" />
+
+    <node pkg="my_slam" type="pcl_mapping" name="dense_mapping_node" output="screen" />
+</launch>
