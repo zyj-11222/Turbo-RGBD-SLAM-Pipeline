@@ -27,6 +27,6 @@
 2. **克隆与编译**：
    ```bash
    mkdir -p ~/slam_ws/src && cd ~/slam_ws/src
-   git clone [https://github.com/YourUsername/Turbo-RGBD-SLAM-Pipeline.git](https://github.com/YourUsername/Turbo-RGBD-SLAM-Pipeline.git) my_slam
+   git clone [https://github.com/zyj-11222/Turbo-RGBD-SLAM-Pipeline.git](https://github.com/zyj-11222/Turbo-RGBD-SLAM-Pipeline.git) my_slam
    cd ~/slam_ws
    catkin_make -DCMAKE_BUILD_TYPE=Release
